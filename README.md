@@ -8,12 +8,12 @@ at the addresses listed in emails.txt.
 
 Put one URL per line on this file, like this:
 
->http://aaroncrowder.com
+>http://aaroncrowder.com  
 >http://crowdcontrol.aaroncrowder.com
 
 ## emails.txt
 
 Put one email address per line in this file, like so:
 
->aaron@aaroncrowder.com
+>aaron@aaroncrowder.com  
 >test@email.com
