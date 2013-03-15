@@ -9,14 +9,9 @@ COMMASPACE = ', '
 me = 'FROM-ADDRESS/USERNAME'
 password = 'USER-PASSWORD'
 
-emailsFile = open('emails.txt', 'U')
-sitesFile = open('sites.txt', 'U')
-
-emails = emailsFile.read()
-emails = emails.split('\n')
-
-sites = sitesFile.read()
-sites = sites.split('\n')
+with open("emails.txt","U") as e_file, open("sites.txt","U") as s_file:
+    sites = e_file.read().split('\n')
+    emails = s_file.read().split('\n')
 
 # Loop over the sites
 for site in sites:
