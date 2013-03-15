@@ -9,7 +9,7 @@ is why I have a users and roles table in the first place. You can modify how
 this script works any way you like, but to get you going I have included the
 create statements you'll need below:
 
-'''sql
+```sql
 CREATE TABLE IF NOT EXISTS `roles` (
   `pk_id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(55) NOT NULL,
@@ -50,5 +50,4 @@ CREATE TABLE IF NOT EXISTS `websitesChecked` (
   `status` tinyint(4) NOT NULL,
   PRIMARY KEY (`pkid`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=78 ;
-
-'''
+```
