@@ -3,20 +3,22 @@ import requests
 import smtplib
 import MySQLdb as mdb
 import sys
+import datetime
+
+import pprint
 
 from email.mime.text import MIMEText
 
 # Define our functions
-def sendErrorMessages(emails, sitesDown, user, password):
+def sendErrorMessages(emails, sitesDown, user, password, server, port):
     msg = MIMEText('These sites are down:\n %s' % ('\n'.join(sitesDown)))
     msg['Subject'] = 'Sites are down!'
     
     msg['From'] = user
     msg['To'] = ', '.join(emails[0])
     
-    # Send the message via GMail
-    server = smtplib.SMTP('smtp.gmail.com:587')
-    server.starttls()  
+    # Send the message via SMTP Mail server
+    server = smtplib.SMTP_SSL(server, port)
     server.login(user, password)
     server.sendmail(user, emails, msg.as_string())
     server.quit()
@@ -49,34 +51,14 @@ def queryDatabase(con, query):
 #end queryDatabase
 
 # Create connection to MySQL Server
-con = createConnection('localhost', 'DBUSER', 'DBPASSWORD', 'DB')
+con = createConnection('localhost', 'root', 'p@ssw0rd', 'CrowdControlMVC')
 if not(con):
     sys.exit(1)
 #end if
 
 # Get our variables ready
-user = queryDatabase(con, 
-    """
-    SELECT 
-        settingValue 
-    FROM 
-        siteSettings 
-    WHERE 
-        settingName = 'email_user'
-    """)[0][0]
-password = queryDatabase(con, 
-    """
-    SELECT 
-        settingValue 
-    FROM 
-        siteSettings 
-    WHERE 
-        settingName = 'email_password'
-    """)[0][0]
-
 sitesDown = []
 sites = queryDatabase(con, "SELECT * FROM websites")
-emails = queryDatabase(con, "SELECT email FROM users WHERE fk_roleid = 1")
 
 # Loop over the sites
 for site in sites:
@@ -100,19 +82,64 @@ for site in sites:
             print 'Site is not ok!'
         #end if
         
-        queryDatabase(con, 
-            """
-            INSERT
-            INTO websitesChecked(fkid_website, status)
-            VALUES(%d, %d)
-            """ % (int(site[0]), status))
+        time_now = datetime.datetime.now().isoformat()
+
+        query = """
+                INSERT
+                INTO websitesChecked(fkid_website, status, timeChecked)
+                VALUES(%s, %s, '%s')
+                """ % (str(int(site[0])), str(status), time_now)
+
+        #print query
+        #sys.exit(1)
+        
+        queryDatabase(con, query)
         
         con.commit()
     #end try/except
 #end for
 
 if(len(sitesDown) > 0):
-    sendErrorMessages(emails, sitesDown, user, password)
+    user = queryDatabase(con, 
+        """
+        SELECT 
+            settingValue 
+        FROM 
+            siteSettings 
+        WHERE 
+            settingName = 'email_user'
+        """)[0][0]
+    password = queryDatabase(con, 
+        """
+        SELECT 
+            settingValue 
+        FROM 
+            siteSettings 
+        WHERE 
+            settingName = 'email_password'
+        """)[0][0]
+    server = queryDatabase(con,
+        """
+        SELECT
+            settingValue
+        FROM
+            siteSettings
+        WHERE
+            settingName = 'email_server'
+        """)[0][0]
+    port = queryDatabase(con,
+        """
+        SELECT
+            settingValue
+        FROM
+            siteSettings
+        WHERE
+            settingName = 'email_port'
+        """)[0][0]
+
+    emails = queryDatabase(con, "SELECT email FROM users WHERE fk_roleid = 1")
+
+    sendErrorMessages(emails, sitesDown, user, password, server, port)
 else:
     print 'All sites where up! Good work!'
 #end if
