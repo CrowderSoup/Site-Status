@@ -2,52 +2,28 @@
 
 This simple script checks to make sure that all the sites you have listed in
 your database are returning 200, 'ok' messages. If one isn't, you will be 
-emailed at the addresses listed for users that are set to the 'admin' role.
+emailed at the addresses listed for each user.
 
-The database being used for this application is actually in production, which
-is why I have a users and roles table in the first place. You can modify how
-this script works any way you like, but to get you going I have included the
-create statements you'll need below:
+This project uses MongoDB. Mongo is perfect for non-relational data, like a log.
+This also makes this script much more light weight.
 
-```sql
-CREATE TABLE IF NOT EXISTS `roles` (
-  `pk_id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(55) NOT NULL,
-  `description` text NOT NULL,
-  PRIMARY KEY (`pk_id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=6 ;
+To get started add a few sites like so:
 
-CREATE TABLE IF NOT EXISTS `siteSettings` (
-  `settingName` varchar(255) NOT NULL,
-  `settingValue` varchar(255) NOT NULL,
-  UNIQUE KEY `settingName` (`settingName`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
-CREATE TABLE IF NOT EXISTS `users` (
-  `pkid` int(11) NOT NULL AUTO_INCREMENT,
-  `fName` varchar(55) NOT NULL DEFAULT '',
-  `lName` varchar(55) NOT NULL DEFAULT '',
-  `uName` varchar(55) NOT NULL,
-  `password` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `salt` varchar(255) NOT NULL,
-  `jsonSettings` text,
-  `fk_roleid` int(11) NOT NULL DEFAULT '5',
-  PRIMARY KEY (`pkid`),
-  UNIQUE KEY `uName` (`uName`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 COMMENT='latin1_swedish_ci' AUTO_INCREMENT=2 ;
-
-CREATE TABLE IF NOT EXISTS `websites` (
-  `pkid` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `url` varchar(255) NOT NULL,
-  PRIMARY KEY (`pkid`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=12 ;
-
-CREATE TABLE IF NOT EXISTS `websitesChecked` (
-  `pkid` int(11) NOT NULL AUTO_INCREMENT,
-  `fkid_website` int(11) NOT NULL,
-  `status` tinyint(4) NOT NULL,
-  PRIMARY KEY (`pkid`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=78 ;
 ```
+python status_check.py insert -s
+```
+
+And a user or two:
+
+```
+python status_check.py insert -u
+```
+
+After which you can run Status Check:
+
+```
+python status_check.py check
+```
+
+For fun you can also run the script without any arguments to see the stats from 
+the last check.

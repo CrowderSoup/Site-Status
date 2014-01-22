@@ -1,148 +1,104 @@
 # Imports
-import requests
-import smtplib
-import MySQLdb as mdb
-import sys
-import datetime
+import sys, getopt, datetime, pymongo, smtplib, requests, pprint
 
-import pprint
-
+from pymongo import MongoClient, ASCENDING, DESCENDING
 from email.mime.text import MIMEText
+from bson.objectid import ObjectId
 
-# Define our functions
-def sendErrorMessages(emails, sitesDown, user, password, server, port):
-    msg = MIMEText('These sites are down:\n %s' % ('\n'.join(sitesDown)))
-    msg['Subject'] = 'Sites are down!'
-    
-    msg['From'] = user
-    msg['To'] = ', '.join(emails[0])
-    
-    # Send the message via SMTP Mail server
-    server = smtplib.SMTP_SSL(server, port)
-    server.login(user, password)
-    server.sendmail(user, emails, msg.as_string())
-    server.quit()
-#end sendErrorMessages
+def insert_site(sites):
+    name = raw_input('Site Name: ')
+    url = raw_input('Site Url: ')
 
-def createConnection(server, username, password, database):
-    con = None
-    
-    try:
-        con = mdb.connect(server, username, password, database)
-    except mdb.Error, e:
-        print "Error %d: %s" % (e.args[0], e.args[1])
-        sys.exit(1)
-    #end try/except
-    
-    return con
-#end createConnection
+    site_id = sites.insert({
+        'name': name,
+        'url': url
+        })
 
-def closeConnection(con):
-    if(con):
-        con.close()
-    #end if
-#end closeConnection
+    return site_id
 
-def queryDatabase(con, query):
-    cur = con.cursor()
-    cur.execute(query)
-    
-    return cur.fetchall()
-#end queryDatabase
+def insert_user(users):
+    name = raw_input('Username: ')
+    email = raw_input('Email address: ')
 
-# Create connection to MySQL Server
-con = createConnection('localhost', 'root', 'p@ssw0rd', 'CrowdControlMVC')
-if not(con):
-    sys.exit(1)
-#end if
+    user_id = users.insert({
+        'name': name,
+        'email': email
+        })
 
-# Get our variables ready
-sitesDown = []
-sites = queryDatabase(con, "SELECT * FROM websites")
+    return user_id
 
-# Loop over the sites
-for site in sites:
-    print 'Checking %s ... ' % (site[1])
-    status = 0
-    try:
-        r = requests.get(site[2])
+def check(sites, status, users):
+    stats = []
+
+    for site in sites.find():
+        try:
+            r = requests.get(site['url'])
+
+            headers = {}
+            for header in r.headers:
+                headers[header] = r.headers[header]
+
+            stat = {
+                'site': site,
+                'code': r.status_code,
+                'headers': headers,
+                'time': datetime.datetime.now().isoformat()
+            }
+        except:
+            print "There was an error, assuming {0} is down".format(site.name)
+        finally:
+            stats.append(stat)
+
+    for stat in stats:
+        if(stat['code'] is not 200):
+            email_users(users, stat)
+    return status.insert(stats)
+
+def last_check(sites, status):
+    for stat in status.find().sort("_id", DESCENDING).limit(sites.count()):
+        pprint.pprint(stat)
+
+def email_users(users, stat):
+    email = {}
+    email['user'] = "aaron@aaroncrowder.com"
+    email['password'] = "Dumbl#d0re"
+    email['server'] = "smtp.crowderfam.org"
+    email['port'] = "465"
+
+    for user in users.find():
+        message = "{0} is down!".format(stat['site']['name'])
+        msg = MIMEText(message)
+        msg['Subject'] = message
         
-        if(r.status_code != requests.codes.ok):
-            sitesDown.append(site[1])
-        else:
-            status = 1
-        #end if
-    except:
-        print 'There was an error, assuming site is down.'
-        sitesDown.append(site[1])
-    finally:
-        if(status):
-            print 'Site is ok!'
-        else:
-            print 'Site is not ok!'
-        #end if
+        msg['From'] = 'aaron@aaroncrowder.com'
+        msg['To'] = user['email']
         
-        time_now = datetime.datetime.now().isoformat()
+        # Send the message via SMTP Mail server
+        server = smtplib.SMTP_SSL(email['server'], email['port'])
+        server.login(email['user'], email['password'])
+        server.sendmail(email['user'], user['email'], msg.as_string())
+        server.quit()
 
-        query = """
-                INSERT
-                INTO websitesChecked(fkid_website, status, timeChecked)
-                VALUES(%s, %s, '%s')
-                """ % (str(int(site[0])), str(status), time_now)
+def main(argv):
+    # Get everything we need
+    client = MongoClient()
+    db = client.status_check
+    sites = db.sites
+    status = db.status
+    users = db.users
 
-        #print query
-        #sys.exit(1)
-        
-        queryDatabase(con, query)
-        
-        con.commit()
-    #end try/except
-#end for
+    if argv and argv[0] == 'insert' and argv[1] == '-s':
+        site_id = insert_site(sites)
+        print "You just inserted a new site, it's Id is", site_id
+    elif argv and argv[0] == 'insert' and argv[1] == '-u':
+        user_id = insert_user(users)
+        print "You just inserted a new user, it's Id is", user_id
+    elif argv and argv[0] == 'check':
+        print "Checking sites..."
+        check(sites, status, users)
+        print "Finished checking sites!"
+    else:
+        last_check(sites, status)
 
-if(len(sitesDown) > 0):
-    user = queryDatabase(con, 
-        """
-        SELECT 
-            settingValue 
-        FROM 
-            siteSettings 
-        WHERE 
-            settingName = 'email_user'
-        """)[0][0]
-    password = queryDatabase(con, 
-        """
-        SELECT 
-            settingValue 
-        FROM 
-            siteSettings 
-        WHERE 
-            settingName = 'email_password'
-        """)[0][0]
-    server = queryDatabase(con,
-        """
-        SELECT
-            settingValue
-        FROM
-            siteSettings
-        WHERE
-            settingName = 'email_server'
-        """)[0][0]
-    port = queryDatabase(con,
-        """
-        SELECT
-            settingValue
-        FROM
-            siteSettings
-        WHERE
-            settingName = 'email_port'
-        """)[0][0]
-
-    emails = queryDatabase(con, "SELECT email FROM users WHERE fk_roleid = 1")
-
-    sendErrorMessages(emails, sitesDown, user, password, server, port)
-else:
-    print 'All sites where up! Good work!'
-#end if
-
-# Close connection to MySQL Server
-closeConnection(con)
+if __name__ == "__main__":
+    main(sys.argv[1:])
