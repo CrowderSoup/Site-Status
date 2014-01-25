@@ -1,0 +1,11 @@
+[mongo_settings]
+server = SERVER
+user = USER
+password = PASSWORD
+source = SOURCEDB
+
+[email_settings]
+server = SERVER
+port = PORT
+user = USER
+password = PASSWORD
