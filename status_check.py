@@ -1,9 +1,10 @@
 # Imports
-import sys, getopt, datetime, pymongo, smtplib, requests, pprint
+import sys, getopt, datetime, pymongo, smtplib, requests, bcrypt, pprint
 
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from email.mime.text import MIMEText
 from bson.objectid import ObjectId
+from ConfigParser import SafeConfigParser
 
 def insert_site(sites):
     name = raw_input('Site Name: ')
@@ -19,15 +20,24 @@ def insert_site(sites):
 def insert_user(users):
     name = raw_input('Username: ')
     email = raw_input('Email address: ')
+    password = raw_input('Password: ')
+    password2 = raw_input('Again: ')
+
+    if password != password2:
+        print "Passwords did not match, aborting."
+        print password
+        print password2
+        return 0;
 
     user_id = users.insert({
         'name': name,
-        'email': email
+        'email': email,
+        'password': bcrypt.hashpw(password, bcrypt.gensalt())
         })
 
     return user_id
 
-def check(sites, status, users):
+def check(sites, status, users, email):
     stats = []
 
     for site in sites.find():
@@ -51,28 +61,22 @@ def check(sites, status, users):
 
     for stat in stats:
         if(stat['code'] is not 200):
-            email_users(users, stat)
+            email_users(users, stat, email)
     return status.insert(stats)
 
 def last_check(sites, status):
     for stat in status.find().sort("_id", DESCENDING).limit(sites.count()):
         pprint.pprint(stat)
 
-def email_users(users, stat):
-    email = {}
-    email['user'] = "aaron@aaroncrowder.com"
-    email['password'] = "Dumbl#d0re"
-    email['server'] = "smtp.crowderfam.org"
-    email['port'] = "465"
-
+def email_users(users, stat, email):
     for user in users.find():
         message = "{0} is down!".format(stat['site']['name'])
         msg = MIMEText(message)
         msg['Subject'] = message
-        
+
         msg['From'] = 'aaron@aaroncrowder.com'
         msg['To'] = user['email']
-        
+
         # Send the message via SMTP Mail server
         server = smtplib.SMTP_SSL(email['server'], email['port'])
         server.login(email['user'], email['password'])
@@ -81,24 +85,46 @@ def email_users(users, stat):
 
 def main(argv):
     # Get everything we need
-    client = MongoClient()
-    db = client.status_check
-    sites = db.sites
-    status = db.status
-    users = db.users
+    parser = SafeConfigParser()
+    parser.read('settings.ini')
 
-    if argv and argv[0] == 'insert' and argv[1] == '-s':
-        site_id = insert_site(sites)
-        print "You just inserted a new site, it's Id is", site_id
-    elif argv and argv[0] == 'insert' and argv[1] == '-u':
-        user_id = insert_user(users)
-        print "You just inserted a new user, it's Id is", user_id
-    elif argv and argv[0] == 'check':
-        print "Checking sites..."
-        check(sites, status, users)
-        print "Finished checking sites!"
+    # Mongo Settings
+    mongo_server = parser.get('mongo_settings', 'server')
+    mongo_user = parser.get('mongo_settings', 'user')
+    mongo_password = parser.get('mongo_settings', 'password')
+    mongo_source = parser.get('mongo_settings', 'source')
+
+    # Email Settings
+    email = {}
+    email['user'] = parser.get('email_settings', 'user')
+    email['password'] = parser.get('email_settings', 'password')
+    email['server'] = parser.get('email_settings', 'server')
+    email['port'] = parser.get('email_settings', 'port')
+
+    client = MongoClient(mongo_server)
+    authenticated = client.status_check.authenticate(
+            mongo_user, mongo_password, source=mongo_source)
+
+    if authenticated:
+        db = client.status_check
+        sites = db.sites
+        status = db.status
+        users = db.users
+
+        if argv and argv[0] == 'insert' and argv[1] == '-s':
+            site_id = insert_site(sites)
+            print "You just inserted a new site, it's Id is", site_id
+        elif argv and argv[0] == 'insert' and argv[1] == '-u':
+            user_id = insert_user(users)
+            print "You just inserted a new user, it's Id is", user_id
+        elif argv and argv[0] == 'check':
+            print "Checking sites..."
+            check(sites, status, users, email)
+            print "Finished checking sites!"
+        else:
+            last_check(sites, status)
     else:
-        last_check(sites, status)
+        print "Could not authenticate."
 
 if __name__ == "__main__":
     main(sys.argv[1:])
