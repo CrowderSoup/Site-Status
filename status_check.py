@@ -4,7 +4,7 @@ import sys, getopt, datetime, pymongo, smtplib, requests, bcrypt, pprint
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from email.mime.text import MIMEText
 from bson.objectid import ObjectId
-from ConfigParser import SafeConfigParser
+from configobj import ConfigObj
 
 def insert_site(sites):
     name = raw_input('Site Name: ')
@@ -24,9 +24,9 @@ def insert_user(users):
     password2 = raw_input('Again: ')
 
     if password != password2:
-        print "Passwords did not match, aborting."
-        print password
-        print password2
+        print("Passwords did not match, aborting.")
+        print(password)
+        print(password2)
         return 0;
 
     user_id = users.insert({
@@ -55,7 +55,7 @@ def check(sites, status, users, email):
                 'time': datetime.datetime.now().isoformat()
             }
         except:
-            print "There was an error, assuming {0} is down".format(site.name)
+            print("There was an error, assuming {0} is down".format(site.name))
         finally:
             stats.append(stat)
 
@@ -85,21 +85,24 @@ def email_users(users, stat, email):
 
 def main(argv):
     # Get everything we need
-    parser = SafeConfigParser()
-    parser.read('settings.ini')
+    config = ConfigObj('settings.ini')
 
     # Mongo Settings
-    mongo_server = parser.get('mongo_settings', 'server')
-    mongo_user = parser.get('mongo_settings', 'user')
-    mongo_password = parser.get('mongo_settings', 'password')
-    mongo_source = parser.get('mongo_settings', 'source')
+    mongo_settings = config['mongo_settings']
+
+    mongo_server = mongo_settings['server']
+    mongo_user = mongo_settings['user']
+    mongo_password = mongo_settings['password']
+    mongo_source = mongo_settings['source']
 
     # Email Settings
+    email_settings = config['email_settings']
     email = {}
-    email['user'] = parser.get('email_settings', 'user')
-    email['password'] = parser.get('email_settings', 'password')
-    email['server'] = parser.get('email_settings', 'server')
-    email['port'] = parser.get('email_settings', 'port')
+
+    email['user'] = email_settings['user']
+    email['password'] = email_settings['password']
+    email['server'] = email_settings['server']
+    email['port'] = email_settings['port']
 
     client = MongoClient(mongo_server)
     authenticated = client.status_check.authenticate(
@@ -113,18 +116,18 @@ def main(argv):
 
         if argv and argv[0] == 'insert' and argv[1] == '-s':
             site_id = insert_site(sites)
-            print "You just inserted a new site, it's Id is", site_id
+            print("You just inserted a new site, it's Id is", site_id)
         elif argv and argv[0] == 'insert' and argv[1] == '-u':
             user_id = insert_user(users)
-            print "You just inserted a new user, it's Id is", user_id
+            print("You just inserted a new user, it's Id is", user_id)
         elif argv and argv[0] == 'check':
-            print "Checking sites..."
+            print("Checking sites...")
             check(sites, status, users, email)
-            print "Finished checking sites!"
+            print("Finished checking sites!")
         else:
             last_check(sites, status)
     else:
-        print "Could not authenticate."
+        print("Could not authenticate.")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
