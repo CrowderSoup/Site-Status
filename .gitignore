@@ -1,3 +1,5 @@
 *.ini
 *.swp
 env
+.DS_Store
+*.pyc
