@@ -1,5 +1,13 @@
 # Site Status
 
+## Current Status
+
+I am currently working on adding a web based front-end to this project using 
+Flask. This project has been built with Python 3.4 in mind, and will probably 
+have issues if you try to run it on an older version of Python.
+
+<hr/>
+
 This simple script checks to make sure that all the sites you have listed in
 your database are returning 200, 'ok' messages. If one isn't, you will be 
 emailed at the addresses listed for each user.
